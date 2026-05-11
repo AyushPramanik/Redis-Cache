@@ -8,7 +8,12 @@
 namespace cache {
 namespace storage {
 
-Store::Store(size_t max_keys) : max_keys_(max_keys) {}
+Store::Store(size_t max_keys) : max_keys_(max_keys) {
+    // Pre-reserve shard buckets to avoid rehash during initial load
+    for (auto& shard : shards_) {
+        shard.map.reserve(max_keys / SHARD_COUNT + 64);
+    }
+}
 
 Store::Shard& Store::shard_for(const std::string& key) noexcept {
     size_t idx = std::hash<std::string>{}(key) % SHARD_COUNT;
