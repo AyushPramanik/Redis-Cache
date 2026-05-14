@@ -53,7 +53,14 @@ bool Connection::on_readable() {
 }
 
 void Connection::process_commands() {
+    // Process all complete commands in the read buffer.
+    // Because multiple commands may have arrived in a single recv() call
+    // (pipelining), we loop until the buffer is drained or a partial command
+    // is reached. Responses are coalesced in out_buf_ and flushed together
+    // by the next EPOLLOUT / EVFILT_WRITE event — this amortizes send() calls
+    // and keeps throughput high under pipelined workloads.
     auto view = in_buf_.readable();
+    std::string batch_resp;
 
     while (!view.empty()) {
         int64_t t0 = util::now_us();
@@ -69,11 +76,14 @@ void Connection::process_commands() {
         in_buf_.consume(result.consumed);
         view = in_buf_.readable();
 
-        std::string resp = dispatcher_.dispatch(result.value, store_);
-        write_response(resp);
+        batch_resp += dispatcher_.dispatch(result.value, store_);
 
         int64_t latency_us = util::now_us() - t0;
         metrics_.record_command(latency_us);
+    }
+
+    if (!batch_resp.empty()) {
+        write_response(batch_resp);
     }
 }
 
