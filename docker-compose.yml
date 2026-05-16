@@ -1,0 +1,30 @@
+version: "3.9"
+
+services:
+  cacheserver:
+    build: .
+    ports:
+      - "6399:6399"   # cache protocol (RESP)
+      - "9999:9999"   # metrics HTTP
+    volumes:
+      - cache_data:/app/data
+    environment:
+      - LOG_LEVEL=info
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
+  dashboard:
+    build: ./dashboard
+    ports:
+      - "5173:80"
+    depends_on:
+      - cacheserver
+    environment:
+      - VITE_METRICS_URL=http://cacheserver:9999
+    restart: unless-stopped
+
+volumes:
+  cache_data:
