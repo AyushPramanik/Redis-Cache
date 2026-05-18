@@ -260,14 +260,14 @@ void Store::maybe_evict() {
     std::unique_lock lock(shard.mutex);
     if (shard.lru.empty()) return;
 
-    const std::string& evict_key = shard.lru.lru_key();
+    // Copy the key before evict_lru() invalidates the list node
+    std::string evict_key = shard.lru.evict_lru();
     auto it = shard.map.find(evict_key);
     if (it != shard.map.end()) {
         auto* node = static_cast<LruList::Node*>(it->second.lru_node);
         delete node;
         shard.map.erase(it);
     }
-    shard.lru.evict_lru();
 
     spdlog::debug("evicted LRU key '{}' from shard {}", evict_key, max_idx);
 }
