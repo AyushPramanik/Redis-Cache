@@ -28,8 +28,10 @@ bool Aof::open() {
 bool Aof::append(const protocol::RespValue& cmd) {
     if (cmd.type != protocol::RespType::Array) return false;
 
-    // Serialize the command as a RESP array of bulk strings
+    // Serialize outside the lock — serialization is pure compute with no
+    // shared state, so we only hold the mutex for the actual I/O call.
     std::string wire;
+    wire.reserve(64);
     wire += "*" + std::to_string(cmd.array.size()) + "\r\n";
     for (const auto& arg : cmd.array) {
         wire += protocol::RespSerializer::bulk(arg.str);
